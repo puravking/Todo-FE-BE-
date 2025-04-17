@@ -5,13 +5,13 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 function Dashboard() {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [todos, setTodos] = useState([]);
+  const [editId, setEditId] = useState(null); // to track edit mode
   const userId = localStorage.getItem("userId");
 
-  // Fetch all todos for the logged-in user when the component mounts
   useEffect(() => {
     const fetchTodos = async () => {
       try {
@@ -31,22 +31,42 @@ function Dashboard() {
     e.preventDefault();
 
     try {
-      const response = await axios.post("http://localhost:3001/dashboard", {
-        title,
-        description,
-        userId
-      });
-
-      if (response && response.data) {
-        setTodos([...todos, response.data]);
-        setTitle("");
-        setDescription("");
+      if (editId) {
+        const response = await axios.put(`http://localhost:3001/dashboard/${editId}`, {
+          title,
+          description,
+        });
+        setTodos(todos.map(todo => todo._id === editId ? response.data : todo));
+        setEditId(null);
       } else {
-        console.log("Unable to push data to database");
+        const response = await axios.post("http://localhost:3001/dashboard", {
+          title,
+          description,
+          userId,
+        });
+        setTodos([...todos, response.data]);
       }
+
+      setTitle("");
+      setDescription("");
     } catch (error) {
       console.error("Error submitting todo:", error);
     }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`http://localhost:3001/dashboard/${id}`);
+      setTodos(todos.filter(todo => todo._id !== id));
+    } catch (error) {
+      console.error("Error deleting todo:", error);
+    }
+  };
+
+  const handleEdit = (id, title, description) => {
+    setEditId(id);
+    setTitle(title);
+    setDescription(description);
   };
 
   return (
@@ -57,7 +77,9 @@ function Dashboard() {
         transition={{ duration: 0.5 }}
         className="text-3xl font-bold text-center mb-8"
       >
-        Welcome to Todo Application
+        Task Manager 2025
+        <br />
+        Welcome Aditya Kumar
       </motion.h1>
 
       <motion.form
@@ -87,7 +109,7 @@ function Dashboard() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           type="submit"
-          value="Submit"
+          value={editId ? "Update" : "Submit"}
           className='cursor-pointer bg-blue-500 text-white font-semibold py-2 px-4 rounded hover:bg-blue-600 transition'
         />
       </motion.form>
@@ -95,24 +117,29 @@ function Dashboard() {
       <div className="mt-10 flex flex-col items-center gap-4">
         {todos.length > 0 ? (
           todos.map((elem, index) => (
-            <Card elem={elem} key={index} />
+            <Card
+              key={index}
+              elem={elem}
+              onDelete={handleDelete}
+              onEdit={handleEdit}
+            />
           ))
         ) : (
           <p className="text-center text-gray-600">No todos found!</p>
         )}
       </div>
-      <motion.button
-            onClick={() => {
-                localStorage.removeItem("userId");
-                navigate("/login");
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="mt-8 mx-auto block bg-red-500 text-white px-6 py-2 rounded-lg shadow-md hover:bg-red-600 transition duration-300"
-            >
-            Logout
-        </motion.button>
 
+      <motion.button
+        onClick={() => {
+          localStorage.removeItem("userId");
+          navigate("/login");
+        }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        className="fixed bottom-6 right-6 bg-red-500 text-white px-6 py-3 rounded-full shadow-lg hover:bg-red-600"
+      >
+        Logout
+      </motion.button>
     </div>
   );
 }
